@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Studium_Catalog.Services</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mapster" />
+    <PackageReference Include="WolverineFx.AmazonSqs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Domain\Studium-Catalog.Domain.csproj" />
+    <ProjectReference Include="..\Data\Studium-Catalog.Data.csproj" />
+  </ItemGroup>
+
+</Project>
