@@ -49,21 +49,3 @@ public record MaintenanceBlockDto(
     DateTime CreatedAtUtc,
     DateTime? CancelledAtUtc
 );
-
-/// <summary>
-/// Booking rules of a room consumed by Studium-Booking to validate reservation requests. Read-only.
-/// </summary>
-/// <param name="RoomId">Unique room identifier. Read-only.</param>
-/// <param name="IsActive">Whether the room accepts reservations. Read-only.</param>
-/// <param name="Capacity">Maximum number of occupants. Read-only.</param>
-/// <param name="TimeZone">IANA time zone in which <paramref name="OperatingHours"/> are expressed. Read-only.</param>
-/// <param name="OperatingHours">Weekly operating windows; reservations must fit entirely inside one window. Read-only.</param>
-/// <param name="MaintenanceBlocks">Pending or active maintenance blocks; reservations must not overlap them. Read-only.</param>
-public record AvailabilityRulesDto(
-    Guid RoomId,
-    bool IsActive,
-    int Capacity,
-    string TimeZone,
-    IReadOnlyList<OperatingHoursDto> OperatingHours,
-    IReadOnlyList<MaintenanceBlockDto> MaintenanceBlocks
-);

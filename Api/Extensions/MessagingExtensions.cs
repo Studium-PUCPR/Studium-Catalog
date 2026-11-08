@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using Amazon;
 using Studium_Catalog.Services.DTOs;
 using Wolverine;
@@ -13,9 +12,6 @@ public static class MessagingExtensions
         builder.Host.UseWolverine(opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(RoomMaintenanceEvent).Assembly);
-
-            opts.UseSystemTextJsonForSerialization(json =>
-                json.Converters.Add(new JsonStringEnumConverter()));
 
             var awsRegion = builder.Configuration["AWS:Region"] ?? "us-east-2";
             opts.UseAmazonSqsTransport(cfg =>
@@ -38,9 +34,7 @@ public static class MessagingExtensions
             var notificationsQueueName = builder.Configuration["AWS:SQS:NotificationsQueueName"];
             if (!string.IsNullOrWhiteSpace(notificationsQueueName))
             {
-                opts.PublishMessage<RoomMaintenanceEvent>()
-                    .ToSqsQueue(notificationsQueueName)
-                    .InteropWithCloudEvents();
+                opts.PublishMessage<RoomMaintenanceEvent>().ToSqsQueue(notificationsQueueName);
             }
         });
     }

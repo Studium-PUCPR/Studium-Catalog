@@ -3,13 +3,12 @@
 Stack: `.NET 10.0` Web API + PostgreSQL (`studium_catalog`) + Amazon SQS (`WolverineFx.AmazonSqs`) + Amazon Cognito (`JwtBearer`) + Scalar API Reference (`/scalar/v1`).
 
 ## Scope
-- **Campus Buildings & Spaces:** Manage buildings (`Building`) and rooms (`Room`) with capacity, floor, and categorization.
+- **Campus Buildings & Spaces:** Manage buildings (`Building`) and rooms (`Room`) with capacity, floor, and categorization under `/api/catalog/buildings` and `/api/catalog/rooms`.
 - **Floor-Plan Map Coordinates (UC021):** Pin coordinates `MapPositionX` and `MapPositionY` (0-100% of floor plan width/height).
 - **Weekly Operating Hours (UC007):** Define weekly operating windows in local time (`America/Sao_Paulo`), ensuring non-overlapping intervals and chronological validation.
 - **Temporary Maintenance Blocks (UC008):** Schedule and cancel temporary maintenance windows with overlap prevention and automatic status resolution.
 - **Room Equipment & Resources:** Track room assets and operational status (`ResourceItem`).
-- **Inter-Service Availability Contract:** Exposes `GET /api/rooms/{id}/availability-rules` for `Studium-Booking` to validate reservation constraints over internal Kubernetes ClusterIP.
-- **Async Event Publishing:** Publishes `RoomMaintenanceEvent` (to booking and notifications queue with CloudEvents interop), `OperatingHoursChangedEvent`, `RoomStatusChangedEvent`, and `ResourceUpdatedEvent` over Amazon SQS.
+- **Async Event Publishing:** Publishes `RoomMaintenanceEvent` (to booking and notifications queue), `OperatingHoursChangedEvent`, `RoomStatusChangedEvent`, and `ResourceUpdatedEvent` over Amazon SQS using Wolverine standard message format.
 
 ## Local Environment Setup & Testing
 

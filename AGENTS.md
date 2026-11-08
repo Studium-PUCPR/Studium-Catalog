@@ -84,3 +84,8 @@
   - Added Wolverine static codegen via `codegen write` in `Dockerfile`.
   - Added 23 passing xUnit unit tests.
   - Added `k8s/deployment.yaml` and `.github/workflows/ci-cd.yml`.
+
+- **2026-11-08 (Alignment with Golden Path Directives):**
+  - Removed dual route attributes (`/api/rooms`, `/api/buildings`), standardizing cleanly on the singular canonical Ingress path prefix (`[Route("api/catalog/buildings")]` and `[Route("api/catalog/rooms")]`).
+  - Removed internal synchronous HTTP contract `GET /api/rooms/{id}/availability-rules` and `AvailabilityRulesDto`, adhering strictly to asynchronous event-driven inter-service architecture via Wolverine over Amazon SQS.
+  - Removed custom `.InteropWithCloudEvents()`, ensuring Wolverine uses its native standard serialization across all outbound queues (`studium-booking-events-queue` and `studium-notifications-queue`).

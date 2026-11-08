@@ -1,4 +1,3 @@
-using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +16,6 @@ namespace Studium_Catalog.Api.Controllers;
 
 [ApiController]
 [Route("api/catalog/rooms")]
-[Route("api/rooms")]
 public class RoomsController(
     CatalogDbContext db,
     IMessageBus bus,
@@ -115,40 +113,6 @@ public class RoomsController(
             return NotFound(new { error = "ROOM_NOT_FOUND", message = $"Room '{id}' was not found." });
 
         return Ok(ToDetailDto(room));
-    }
-
-    /// <summary>
-    /// Internal endpoint queried by Studium-Booking to validate room rules, operating hours, and active blocks.
-    /// </summary>
-    [HttpGet("{id:guid}/availability-rules")]
-    public async Task<ActionResult<AvailabilityRulesDto>> GetAvailabilityRules(Guid id, CancellationToken ct)
-    {
-        var now = DateTime.UtcNow;
-        var room = await db.Rooms
-            .AsNoTracking()
-            .Include(r => r.OperatingHours)
-            .Include(r => r.MaintenanceBlocks.Where(m => m.CancelledAtUtc == null && m.EndsAtUtc > now))
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
-
-        if (room is null)
-            return NotFound(new { error = "ROOM_NOT_FOUND", message = $"Room '{id}' was not found." });
-
-        var rules = new AvailabilityRulesDto(
-            RoomId: room.Id,
-            IsActive: room.IsActive,
-            Capacity: room.Capacity,
-            TimeZone: _options.TimeZone,
-            OperatingHours: room.OperatingHours
-                .OrderBy(h => h.DayOfWeek)
-                .ThenBy(h => h.OpensAt)
-                .Select(h => new OperatingHoursDto(h.DayOfWeek, h.OpensAt, h.ClosesAt))
-                .ToList(),
-            MaintenanceBlocks: room.MaintenanceBlocks
-                .OrderBy(m => m.StartsAtUtc)
-                .Select(ToMaintenanceDto)
-                .ToList());
-
-        return Ok(rules);
     }
 
     /// <summary>

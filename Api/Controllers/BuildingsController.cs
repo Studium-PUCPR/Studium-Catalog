@@ -9,7 +9,6 @@ namespace Studium_Catalog.Api.Controllers;
 
 [ApiController]
 [Route("api/catalog/buildings")]
-[Route("api/buildings")]
 public class BuildingsController(CatalogDbContext db) : ControllerBase
 {
     /// <summary>
