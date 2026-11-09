@@ -1,15 +1,17 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Studium_Catalog.Api.Extensions;
 using Studium_Catalog.Data;
 using Studium_Catalog.Domain.Entities.Buildings;
 using Studium_Catalog.Services.DTOs;
+using Wolverine;
 
 namespace Studium_Catalog.Api.Controllers;
 
 [ApiController]
 [Route("api/catalog/buildings")]
-public class BuildingsController(CatalogDbContext db) : ControllerBase
+public class BuildingsController(CatalogDbContext db, IMessageBus bus) : ControllerBase
 {
     /// <summary>
     /// Lists all buildings ordered by code, with their registered room count.
@@ -82,6 +84,15 @@ public class BuildingsController(CatalogDbContext db) : ControllerBase
         db.Buildings.Add(building);
         await db.SaveChangesAsync(ct);
 
+        await bus.PublishAsync(new AuditIntegrationEvent(
+            ServiceSource: "Catalog",
+            ResourceId: building.Id.ToString(),
+            ActorId: User.GetUserId(),
+            Action: "BuildingCreated",
+            MetadataJson: $"{{\"code\":\"{building.Code}\",\"name\":\"{building.Name}\"}}",
+            TimestampUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid()));
+
         var dto = new BuildingDto(
             building.Id,
             building.Code,
@@ -125,6 +136,15 @@ public class BuildingsController(CatalogDbContext db) : ControllerBase
         building.Update(request.Code, request.Name, request.Address, request.Description);
         await db.SaveChangesAsync(ct);
 
+        await bus.PublishAsync(new AuditIntegrationEvent(
+            ServiceSource: "Catalog",
+            ResourceId: building.Id.ToString(),
+            ActorId: User.GetUserId(),
+            Action: "BuildingUpdated",
+            MetadataJson: $"{{\"code\":\"{building.Code}\",\"name\":\"{building.Name}\"}}",
+            TimestampUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid()));
+
         return Ok(new BuildingDto(
             building.Id,
             building.Code,
@@ -153,6 +173,15 @@ public class BuildingsController(CatalogDbContext db) : ControllerBase
 
         db.Buildings.Remove(building);
         await db.SaveChangesAsync(ct);
+
+        await bus.PublishAsync(new AuditIntegrationEvent(
+            ServiceSource: "Catalog",
+            ResourceId: building.Id.ToString(),
+            ActorId: User.GetUserId(),
+            Action: "BuildingDeleted",
+            MetadataJson: $"{{\"code\":\"{building.Code}\",\"name\":\"{building.Name}\"}}",
+            TimestampUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid()));
 
         return NoContent();
     }

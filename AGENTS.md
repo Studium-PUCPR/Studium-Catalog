@@ -15,10 +15,12 @@
   - `Studium-Catalog.Api` (Thin composition root, Scalar, OpenAPI, Health check)
   - `Studium-Catalog.Tests` (xUnit test suite with 23 passing unit tests)
 
-### 1.2 Messaging Topology: Wolverine with RabbitMQ
+### 1.2 Messaging Topology: Wolverine with RabbitMQ & EventId Propagation
 - **Decision:**
   - Connect to RabbitMQ broker (`amqp://studium:StudiumRabbitMQ2026!@studium-rabbitmq-service.studium.svc.cluster.local:5672`) with `.AutoProvision()`.
   - Publish `RoomMaintenanceEvent`, `OperatingHoursChangedEvent`, `RoomStatusChangedEvent`, and `ResourceUpdatedEvent` to `studium-booking-events-queue`.
+  - Publish `AuditIntegrationEvent` (`[MessageIdentity("studium.audit.integration-event")]`) to `studium-audit-events-queue` for all administrative actions (building creation/update/deletion, room creation/update/activation/deactivation, and maintenance block scheduling/cancellation).
+  - Outbound EventId Propagation: All events generated via `CatalogEventFactory` and controllers carry a deterministic `EventId: Guid.NewGuid()` for distributed deduplication.
   - Configured transactional outbox via `opts.Policies.AutoApplyTransactions()`.
   - Poison Message & Dead-Letter Handling: Configured Wolverine transient exception retries (`NpgsqlException`, `TimeoutException`, `HttpRequestException`) with exponential cooldowns and unhandled errors routing to `.error` queue.
 
@@ -44,10 +46,11 @@
   - `Configurations/` — Fluent API configurations.
   - `Migrations/` — Auto-applied migrations.
 - **`Services/`:**
-  - `DTOs/` — Request, response, and event contracts.
+  - `DTOs/EventDtos.cs` — Request, response, and event contracts (includes `AuditIntegrationEvent`).
+  - `CatalogEvents/CatalogEventFactory.cs` — Outbound event factory propagating deterministic `EventId`.
   - `Mapping/MappingConfig.cs` — Mapster compile-safe mappings.
 - **`Api/`:**
-  - `Controllers/BuildingsController.cs` & `RoomsController.cs` — REST endpoints under `/api/catalog/buildings` and `/api/catalog/rooms`.
+  - `Controllers/BuildingsController.cs` & `RoomsController.cs` — REST endpoints under `/api/catalog/buildings` and `/api/catalog/rooms` with audit log publishing.
   - `HostedServices/DatabaseMigrationHostedService.cs` — Startup migration runner.
   - `Extensions/AuthenticationExtensions.cs`, `MessagingExtensions.cs`, `CorsExtensions.cs`, `DatabaseHealthCheck.cs`.
 - **`Tests/`:**
@@ -57,19 +60,28 @@
 ---
 
 ## 3. Recent Changes History
+- **2026-11-09 (Administrative Audit Publishing & Outbound EventId Propagation):**
+  - Added `AuditIntegrationEvent` message contract and configured Wolverine routing to `studium-audit-events-queue`.
+  - Added `EventId: Guid? = null` to all catalog integration events, populated via `CatalogEventFactory`.
+  - Added audit logging to `BuildingsController` (create, update, delete) and `RoomsController` (create, update, activate/deactivate, schedule/cancel maintenance).
+  - Added `RabbitMQ:AuditQueueName` in `appsettings.json` and `k8s/deployment.yaml`.
+  - Verified 23/23 unit tests pass.
 - **2026-11-09 (Dynamic CORS Configuration):**
   - Added `CorsExtensions.cs` reading allowed origins dynamically from configuration/environment variables.
   - Hooked `AddStudiumCors` and `UseCors(CorsExtensions.PolicyName)` into `Program.cs`.
   - Added `Cors:AllowedOrigins: "*"` in `appsettings.json` and `Cors__AllowedOrigins` in `k8s/deployment.yaml`.
   - Verified 23/23 unit tests pass.
-- **2026-11-09 (Database Resilience, Deep Readiness Probes & DLQ Policies):**
-  - Configured `EnableRetryOnFailure(3)` on PostgreSQL connection.
-  - Added deep readiness probe `/health/ready` (`DatabaseHealthCheck`) and pointed Kubernetes `readinessProbe` to it.
-  - Configured Wolverine exception policies for transient retries and dead-letter error queue routing.
-  - Verified all 23 unit tests pass.
-- **2026-11-09 (Wolverine Transactional Outbox):**
+- **2026-11-09 (Database Resilience, Deep Readiness Probe & Wolverine DLQ):**
+  - Added `EnableRetryOnFailure(3)` inside PostgreSQL `UseNpgsql` registration.
+  - Added `DatabaseHealthCheck.cs` verifying database connectivity for Kubernetes `readinessProbe` at `/health/ready`.
+  - Configured Wolverine 3x retry policies with cooldown for `NpgsqlException`, `TimeoutException`, `HttpRequestException`, and routed terminal poison messages to dead-letter error queue (`opts.OnException<Exception>().MoveToErrorQueue()`).
+  - Regenerated Wolverine static handlers via `codegen write` and verified 23/23 unit tests pass.
+- **2026-11-09 (RBAC Hardening, Message Identity & Transactional Outbox):**
+  - Configured `AdminOnly` authorization policy and Cognito claim mapping in `AuthenticationExtensions.cs`.
+  - Added `[MessageIdentity]` to events in `Services/DTOs/EventDtos.cs`.
   - Enabled transactional outbox via `opts.Policies.AutoApplyTransactions()` in `MessagingExtensions.cs`.
-- **2026-11-09 (Cleaned Obsolete Notifications Queue & SQS Config):**
-  - Removed obsolete publishing of `RoomMaintenanceEvent` to `studium-notifications-queue`.
-- **2026-11-09 (Migrated Messaging from AWS SQS to RabbitMQ):**
-  - Replaced `WolverineFx.AmazonSqs` with `WolverineFx.RabbitMQ` (v6.63.0).
+  - Regenerated Wolverine static handlers and verified all 23 unit tests pass.
+- **2026-11-09 (Initial Microservice Scaffold & Implementation):**
+  - Scaffolded .NET 10 Clean Architecture solution with PostgreSQL database `studium_catalog`.
+  - Implemented building and room management, operating hours, maintenance blocks, and Wolverine RabbitMQ publishing.
+  - Verified 23/23 unit tests and generated static Wolverine handlers via `codegen write`.

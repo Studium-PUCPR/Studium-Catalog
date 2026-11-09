@@ -40,7 +40,8 @@ public record RoomMaintenanceEvent(
     DateTime StartsAtUtc,
     DateTime EndsAtUtc,
     string Reason,
-    DateTime OccurredAtUtc
+    DateTime OccurredAtUtc,
+    Guid? EventId = null
 );
 
 /// <summary>
@@ -50,12 +51,14 @@ public record RoomMaintenanceEvent(
 /// <param name="TimeZone">IANA time zone in which the operating hours are expressed. Read-only.</param>
 /// <param name="OperatingHours">New complete weekly operating grid. Read-only.</param>
 /// <param name="OccurredAtUtc">UTC timestamp when the change occurred. Read-only.</param>
+/// <param name="EventId">Deterministic deduplication identifier for idempotent message consumers.</param>
 [MessageIdentity("studium.catalog.operating-hours-changed")]
 public record OperatingHoursChangedEvent(
     Guid RoomId,
     string TimeZone,
     IReadOnlyList<OperatingHoursDto> OperatingHours,
-    DateTime OccurredAtUtc
+    DateTime OccurredAtUtc,
+    Guid? EventId = null
 );
 
 /// <summary>
@@ -64,11 +67,13 @@ public record OperatingHoursChangedEvent(
 /// <param name="RoomId">Identifier of the room. Read-only.</param>
 /// <param name="IsActive">Whether the room now accepts reservations. Read-only.</param>
 /// <param name="OccurredAtUtc">UTC timestamp when the change occurred. Read-only.</param>
+/// <param name="EventId">Deterministic deduplication identifier for idempotent message consumers.</param>
 [MessageIdentity("studium.catalog.room-status-changed")]
 public record RoomStatusChangedEvent(
     Guid RoomId,
     bool IsActive,
-    DateTime OccurredAtUtc
+    DateTime OccurredAtUtc,
+    Guid? EventId = null
 );
 
 /// <summary>
@@ -82,6 +87,7 @@ public record RoomStatusChangedEvent(
 /// <param name="Quantity">Number of identical units installed. Read-only.</param>
 /// <param name="Status">Operational status of the resource. Read-only.</param>
 /// <param name="OccurredAtUtc">UTC timestamp when the change occurred. Read-only.</param>
+/// <param name="EventId">Deterministic deduplication identifier for idempotent message consumers.</param>
 [MessageIdentity("studium.catalog.resource-updated")]
 public record ResourceUpdatedEvent(
     ResourceEventType EventType,
@@ -91,5 +97,20 @@ public record ResourceUpdatedEvent(
     ResourceType Type,
     int Quantity,
     ResourceStatus Status,
-    DateTime OccurredAtUtc
+    DateTime OccurredAtUtc,
+    Guid? EventId = null
+);
+
+/// <summary>
+/// Outbound message payload published to Studium-Audit for administrative catalog changes.
+/// </summary>
+[MessageIdentity("studium.audit.integration-event")]
+public record AuditIntegrationEvent(
+    string ServiceSource,
+    string ResourceId,
+    string ActorId,
+    string Action,
+    string? MetadataJson = null,
+    DateTime? TimestampUtc = null,
+    Guid? EventId = null
 );

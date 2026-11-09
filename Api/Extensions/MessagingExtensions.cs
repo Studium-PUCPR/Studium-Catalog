@@ -26,6 +26,9 @@ public static class MessagingExtensions
             opts.PublishMessage<RoomStatusChangedEvent>().ToRabbitQueue(bookingQueueName);
             opts.PublishMessage<ResourceUpdatedEvent>().ToRabbitQueue(bookingQueueName);
 
+            var auditQueueName = builder.Configuration["RabbitMQ:AuditQueueName"] ?? "studium-audit-events-queue";
+            opts.PublishMessage<AuditIntegrationEvent>().ToRabbitQueue(auditQueueName);
+
             opts.Policies.AutoApplyTransactions();
 
             opts.OnException<NpgsqlException>()

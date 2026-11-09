@@ -151,6 +151,15 @@ public class RoomsController(
         db.Rooms.Add(room);
         await db.SaveChangesAsync(ct);
 
+        await bus.PublishAsync(new AuditIntegrationEvent(
+            ServiceSource: "Catalog",
+            ResourceId: room.Id.ToString(),
+            ActorId: User.GetUserId(),
+            Action: "RoomCreated",
+            MetadataJson: $"{{\"code\":\"{room.Code}\",\"name\":\"{room.Name}\",\"buildingId\":\"{building.Id}\"}}",
+            TimestampUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid()));
+
         var dto = new RoomDetailDto(
             room.Id,
             building.Id,
@@ -207,6 +216,15 @@ public class RoomsController(
 
         room.UpdateDetails(request.Code, request.Name, request.Type, request.Capacity, request.Floor, request.Description);
         await db.SaveChangesAsync(ct);
+
+        await bus.PublishAsync(new AuditIntegrationEvent(
+            ServiceSource: "Catalog",
+            ResourceId: room.Id.ToString(),
+            ActorId: User.GetUserId(),
+            Action: "RoomUpdated",
+            MetadataJson: $"{{\"code\":\"{room.Code}\",\"name\":\"{room.Name}\"}}",
+            TimestampUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid()));
 
         return Ok(ToDetailDto(room));
     }
@@ -266,6 +284,15 @@ public class RoomsController(
 
         await db.SaveChangesAsync(ct);
         await bus.PublishAsync(CatalogEventFactory.StatusChanged(room));
+
+        await bus.PublishAsync(new AuditIntegrationEvent(
+            ServiceSource: "Catalog",
+            ResourceId: room.Id.ToString(),
+            ActorId: User.GetUserId(),
+            Action: room.IsActive ? "RoomActivated" : "RoomDeactivated",
+            MetadataJson: $"{{\"isActive\":{room.IsActive.ToString().ToLowerInvariant()}}}",
+            TimestampUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid()));
 
         return Ok(ToDetailDto(room));
     }
@@ -332,6 +359,15 @@ public class RoomsController(
         var eventPayload = CatalogEventFactory.Maintenance(room, block, RoomMaintenanceEventType.MaintenanceScheduled);
         await bus.PublishAsync(eventPayload);
 
+        await bus.PublishAsync(new AuditIntegrationEvent(
+            ServiceSource: "Catalog",
+            ResourceId: room.Id.ToString(),
+            ActorId: adminUserId,
+            Action: "MaintenanceScheduled",
+            MetadataJson: $"{{\"blockId\":\"{block.Id}\",\"startsAtUtc\":\"{block.StartsAtUtc:O}\",\"endsAtUtc\":\"{block.EndsAtUtc:O}\",\"reason\":\"{block.Reason}\"}}",
+            TimestampUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid()));
+
         return CreatedAtAction(
             nameof(GetRoomById),
             new { id = room.Id },
@@ -360,6 +396,15 @@ public class RoomsController(
 
         var eventPayload = CatalogEventFactory.Maintenance(room, block, RoomMaintenanceEventType.MaintenanceCancelled);
         await bus.PublishAsync(eventPayload);
+
+        await bus.PublishAsync(new AuditIntegrationEvent(
+            ServiceSource: "Catalog",
+            ResourceId: room.Id.ToString(),
+            ActorId: User.GetUserId(),
+            Action: "MaintenanceCancelled",
+            MetadataJson: $"{{\"blockId\":\"{block.Id}\"}}",
+            TimestampUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid()));
 
         return Ok(ToMaintenanceDto(block));
     }

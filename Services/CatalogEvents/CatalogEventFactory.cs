@@ -23,7 +23,8 @@ public static class CatalogEventFactory
             StartsAtUtc: block.StartsAtUtc,
             EndsAtUtc: block.EndsAtUtc,
             Reason: block.Reason,
-            OccurredAtUtc: DateTime.UtcNow);
+            OccurredAtUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid());
 
     public static OperatingHoursChangedEvent OperatingHoursChanged(
         Guid roomId,
@@ -33,10 +34,11 @@ public static class CatalogEventFactory
             RoomId: roomId,
             TimeZone: timeZone,
             OperatingHours: operatingHours.Adapt<List<OperatingHoursDto>>(),
-            OccurredAtUtc: DateTime.UtcNow);
+            OccurredAtUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid());
 
     public static RoomStatusChangedEvent StatusChanged(Room room) =>
-        new(room.Id, room.IsActive, DateTime.UtcNow);
+        new(room.Id, room.IsActive, DateTime.UtcNow, Guid.NewGuid());
 
     public static ResourceUpdatedEvent Resource(ResourceItem resource, ResourceEventType eventType) =>
         new(
@@ -47,5 +49,6 @@ public static class CatalogEventFactory
             Type: resource.Type,
             Quantity: resource.Quantity,
             Status: resource.Status,
-            OccurredAtUtc: DateTime.UtcNow);
+            OccurredAtUtc: DateTime.UtcNow,
+            EventId: Guid.NewGuid());
 }
