@@ -13,7 +13,7 @@
   - `Studium-Catalog.Data` (EF Core 10, Npgsql PostgreSQL)
   - `Studium-Catalog.Services` (DTOs, Wolverine, Mapster)
   - `Studium-Catalog.Api` (Thin composition root, Scalar, OpenAPI, Health check)
-  - `Studium-Catalog.Tests` (xUnit test suite)
+  - `Studium-Catalog.Tests` (xUnit test suite with 23 passing tests)
 
 ### 1.2 Domain Model & Aggregates
 - **Entities:**
@@ -23,25 +23,20 @@
   - `AvailabilitySchedule`: Weekly operating windows (`DayOfWeek`, `OpensAt`, `ClosesAt`). Enforces chronological ordering, opening < closing, and non-overlapping windows per day via `Room.SetOperatingHours`.
   - `MaintenanceBlock`: Temporary blocking interval (`StartsAtUtc`, `EndsAtUtc`, `Reason`, `CreatedByUserId`). Validates future end date and non-overlapping intervals via `Room.ScheduleMaintenance` and `CancelMaintenance`.
 
-### 1.3 Wolverine Messaging over Amazon SQS
-- **Conclusion:** Wolverine over SQS is used for outbound domain events:
-  - `RoomMaintenanceEvent` (`studium.catalog.room-maintenance`): Published when maintenance is scheduled or cancelled. Dispatched to `studium-booking-events-queue` and `studium-notifications-queue` (with CloudEvents interop for Python consumer).
-  - `OperatingHoursChangedEvent` (`studium.catalog.operating-hours-changed`): Published to `studium-booking-events-queue`.
-  - `RoomStatusChangedEvent` (`studium.catalog.room-status-changed`): Published to `studium-booking-events-queue`.
-  - `ResourceUpdatedEvent` (`studium.catalog.resource-updated`): Published to `studium-booking-events-queue`.
+### 1.3 Wolverine Messaging over RabbitMQ
+- **Conclusion:** Wolverine over RabbitMQ (`WolverineFx.RabbitMQ`) is used for outbound domain events connecting to `studium-rabbitmq-service.studium.svc.cluster.local:5672`:
+  - `RoomMaintenanceEvent`: Published when maintenance is scheduled or cancelled. Dispatched to `studium-booking-events-queue` and `studium-notifications-queue`.
+  - `OperatingHoursChangedEvent`: Published to `studium-booking-events-queue`.
+  - `RoomStatusChangedEvent`: Published to `studium-booking-events-queue`.
+  - `ResourceUpdatedEvent`: Published to `studium-booking-events-queue`.
 - **Pre-generated Code:** Configured with `CritterStackDefaults` using `TypeLoadMode.Static` in Production and pre-generated via `codegen write` during Docker multi-stage build.
-
-### 1.4 REST Endpoints & Route Prefixes
-- Dual route mapping on controllers:
-  - `[Route("api/catalog/buildings")]` and `[Route("api/buildings")]`
-  - `[Route("api/catalog/rooms")]` and `[Route("api/rooms")]`
-  This supports external gateway prefix routing (`/api/catalog/*`) and internal Kubernetes service discovery (`GET /api/rooms/{id}/availability-rules` for `Studium-Booking`).
+- **Legacy branch:** AWS SQS version preserved on branch `origin/sqs`.
 
 ---
 
 ## 2. Project Structure & File Map
 - [`Studium-Catalog.sln`](./Studium-Catalog.sln) — Root solution file.
-- [`Directory.Build.props`](./Directory.Build.props) & [`Directory.Packages.props`](./Directory.Packages.props) — CPM and build settings.
+- [`Directory.Build.props`](./Directory.Build.props) & [`Directory.Packages.props`](./Directory.Packages.props) — CPM with `WolverineFx.RabbitMQ`.
 - **`Domain/`:**
   - `Entities/Buildings/Building.cs` — Building entity and invariants.
   - `Entities/Rooms/Room.cs` — Room aggregate root.
@@ -59,8 +54,8 @@
   - `CatalogEvents/CatalogEventFactory.cs` — Outbound event builder.
   - `Options/CatalogOptions.cs` — Timezone and catalog options.
 - **`Api/`:**
-  - `Program.cs` — Thin composition root with OpenAPI, Scalar, Wolverine SQS, and Health check.
-  - `Controllers/BuildingsController.cs` & `RoomsController.cs` — Dual-routed REST controllers.
+  - `Program.cs` — Thin composition root with OpenAPI, Scalar, Wolverine RabbitMQ, and Health check.
+  - `Controllers/BuildingsController.cs` & `RoomsController.cs` — REST controllers.
   - `Middleware/DomainExceptionHandler.cs` — ProblemDetails exception handler.
   - `HostedServices/DatabaseMigrationHostedService.cs` — Startup migration runner.
   - `Extensions/AuthenticationExtensions.cs` & `MessagingExtensions.cs` — Modular DI extensions.
@@ -74,18 +69,12 @@
 ---
 
 ## 3. Recent Changes History
-- **2026-11-08 (Initial Implementation):**
-  - Scaffolded 5-project Clean Architecture solution with .NET 10 and CPM.
-  - Implemented Domain entities: `Building`, `Room`, `ResourceItem`, `AvailabilitySchedule`, `MaintenanceBlock`.
-  - Implemented Data layer with `CatalogDbContext` and isolated Fluent API configurations with PostgreSQL constraints.
-  - Generated initial EF Core migration `20261108230207_Initial_Migration`.
-  - Implemented Services DTOs and Wolverine SQS outbound integration events (`RoomMaintenanceEvent`, `OperatingHoursChangedEvent`, `RoomStatusChangedEvent`, `ResourceUpdatedEvent`).
-  - Implemented `BuildingsController` and `RoomsController` with dual routing, floor-plan map coordinates (`UC021`), operating hours (`UC007`), maintenance blocks (`UC008`), and `GET /api/rooms/{id}/availability-rules`.
-  - Added Wolverine static codegen via `codegen write` in `Dockerfile`.
-  - Added 23 passing xUnit unit tests.
-  - Added `k8s/deployment.yaml` and `.github/workflows/ci-cd.yml`.
-
+- **2026-11-09 (Migrated Messaging from AWS SQS to RabbitMQ):**
+  - Replaced `WolverineFx.AmazonSqs` with `WolverineFx.RabbitMQ` (v6.63.0) across `Directory.Packages.props`, `Services/Studium-Catalog.Services.csproj`, and `Api/Studium-Catalog.Api.csproj`.
+  - Updated `Api/Extensions/MessagingExtensions.cs` to connect to RabbitMQ broker with `.AutoProvision()`.
+  - Updated `k8s/deployment.yaml` with RabbitMQ configuration keys.
+  - Re-generated static handlers; 23 unit tests passing.
+  - SQS version preserved on branch `origin/sqs`.
 - **2026-11-08 (Alignment with Golden Path Directives):**
-  - Removed dual route attributes (`/api/rooms`, `/api/buildings`), standardizing cleanly on the singular canonical Ingress path prefix (`[Route("api/catalog/buildings")]` and `[Route("api/catalog/rooms")]`).
-  - Removed internal synchronous HTTP contract `GET /api/rooms/{id}/availability-rules` and `AvailabilityRulesDto`, adhering strictly to asynchronous event-driven inter-service architecture via Wolverine over Amazon SQS.
-  - Removed custom `.InteropWithCloudEvents()`, ensuring Wolverine uses its native standard serialization across all outbound queues (`studium-booking-events-queue` and `studium-notifications-queue`).
+  - Standardized on singular canonical Ingress path prefix (`[Route("api/catalog/buildings")]` and `[Route("api/catalog/rooms")]`).
+  - Removed internal synchronous HTTP contract `GET /api/rooms/{id}/availability-rules`, adhering strictly to asynchronous event-driven inter-service architecture.

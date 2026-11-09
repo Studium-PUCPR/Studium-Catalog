@@ -1,6 +1,8 @@
 # Studium-Catalog
 
-Stack: `.NET 10.0` Web API + PostgreSQL (`studium_catalog`) + Amazon SQS (`WolverineFx.AmazonSqs`) + Amazon Cognito (`JwtBearer`) + Scalar API Reference (`/scalar/v1`).
+Stack: `.NET 10.0` Web API + PostgreSQL (`studium_catalog`) + RabbitMQ (`WolverineFx.RabbitMQ`) + Amazon Cognito (`JwtBearer`) + Scalar API Reference (`/scalar/v1`).
+
+> **Note on Messaging Architecture:** Messaging is powered by **RabbitMQ** (AMQP) via Wolverine for academic compliance. A legacy AWS SQS version is preserved on branch `origin/sqs`.
 
 ## Scope
 - **Campus Buildings & Spaces:** Manage buildings (`Building`) and rooms (`Room`) with capacity, floor, and categorization under `/api/catalog/buildings` and `/api/catalog/rooms`.
@@ -8,7 +10,7 @@ Stack: `.NET 10.0` Web API + PostgreSQL (`studium_catalog`) + Amazon SQS (`Wolve
 - **Weekly Operating Hours (UC007):** Define weekly operating windows in local time (`America/Sao_Paulo`), ensuring non-overlapping intervals and chronological validation.
 - **Temporary Maintenance Blocks (UC008):** Schedule and cancel temporary maintenance windows with overlap prevention and automatic status resolution.
 - **Room Equipment & Resources:** Track room assets and operational status (`ResourceItem`).
-- **Async Event Publishing:** Publishes `RoomMaintenanceEvent` (to booking and notifications queue), `OperatingHoursChangedEvent`, `RoomStatusChangedEvent`, and `ResourceUpdatedEvent` over Amazon SQS using Wolverine standard message format.
+- **Async Event Publishing:** Publishes `RoomMaintenanceEvent` (to booking and notifications queue), `OperatingHoursChangedEvent`, `RoomStatusChangedEvent`, and `ResourceUpdatedEvent` over RabbitMQ using Wolverine standard message format.
 
 ## Local Environment Setup & Testing
 

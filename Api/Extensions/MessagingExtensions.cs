@@ -1,7 +1,6 @@
-using Amazon;
 using Studium_Catalog.Services.DTOs;
 using Wolverine;
-using Wolverine.AmazonSqs;
+using Wolverine.RabbitMQ;
 
 namespace Studium_Catalog.Api.Extensions;
 
@@ -13,29 +12,20 @@ public static class MessagingExtensions
         {
             opts.Discovery.IncludeAssembly(typeof(RoomMaintenanceEvent).Assembly);
 
-            var awsRegion = builder.Configuration["AWS:Region"] ?? "us-east-2";
-            opts.UseAmazonSqsTransport(cfg =>
-            {
-                cfg.RegionEndpoint = RegionEndpoint.GetBySystemName(awsRegion);
-                var serviceUrl = builder.Configuration["AWS:ServiceURL"];
-                if (!string.IsNullOrWhiteSpace(serviceUrl))
-                    cfg.ServiceURL = serviceUrl;
-            }).AutoProvision();
+            var rabbitConnectionString = builder.Configuration["RabbitMQ:ConnectionString"]
+                ?? builder.Configuration["RABBITMQ_URL"]
+                ?? "amqp://studium:StudiumRabbitMQ2026!@studium-rabbitmq-service.studium.svc.cluster.local:5672";
 
-            var bookingQueueName = builder.Configuration["AWS:SQS:BookingQueueName"];
-            if (!string.IsNullOrWhiteSpace(bookingQueueName))
-            {
-                opts.PublishMessage<RoomMaintenanceEvent>().ToSqsQueue(bookingQueueName);
-                opts.PublishMessage<OperatingHoursChangedEvent>().ToSqsQueue(bookingQueueName);
-                opts.PublishMessage<RoomStatusChangedEvent>().ToSqsQueue(bookingQueueName);
-                opts.PublishMessage<ResourceUpdatedEvent>().ToSqsQueue(bookingQueueName);
-            }
+            opts.UseRabbitMq(new Uri(rabbitConnectionString)).AutoProvision();
 
-            var notificationsQueueName = builder.Configuration["AWS:SQS:NotificationsQueueName"];
-            if (!string.IsNullOrWhiteSpace(notificationsQueueName))
-            {
-                opts.PublishMessage<RoomMaintenanceEvent>().ToSqsQueue(notificationsQueueName);
-            }
+            var bookingQueueName = builder.Configuration["RabbitMQ:BookingQueueName"] ?? "studium-booking-events-queue";
+            opts.PublishMessage<RoomMaintenanceEvent>().ToRabbitQueue(bookingQueueName);
+            opts.PublishMessage<OperatingHoursChangedEvent>().ToRabbitQueue(bookingQueueName);
+            opts.PublishMessage<RoomStatusChangedEvent>().ToRabbitQueue(bookingQueueName);
+            opts.PublishMessage<ResourceUpdatedEvent>().ToRabbitQueue(bookingQueueName);
+
+            var notificationsQueueName = builder.Configuration["RabbitMQ:NotificationsQueueName"] ?? "studium-notifications-queue";
+            opts.PublishMessage<RoomMaintenanceEvent>().ToRabbitQueue(notificationsQueueName);
         });
     }
 }
