@@ -18,8 +18,15 @@ builder.Services.Configure<CatalogOptions>(
     builder.Configuration.GetSection(CatalogOptions.SectionName));
 
 builder.Services.AddDbContext<CatalogDbContext>(
-    options => options.UseNpgsql(connectionString),
+    options => options.UseNpgsql(connectionString, npgsql =>
+        npgsql.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorCodesToAdd: null)),
     optionsLifetime: ServiceLifetime.Singleton);
+
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database");
 
 builder.Services.AddHostedService<DatabaseMigrationHostedService>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
@@ -62,5 +69,6 @@ app.MapGet("/health", () => Results.Ok(new
     service = "Studium-Catalog",
     pod = Environment.MachineName
 }));
+app.MapHealthChecks("/health/ready");
 
 return await app.RunJasperFxCommands(args);
