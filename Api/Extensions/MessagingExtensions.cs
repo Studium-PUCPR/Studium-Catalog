@@ -23,6 +23,8 @@ public static class MessagingExtensions
             opts.PublishMessage<OperatingHoursChangedEvent>().ToRabbitQueue(bookingQueueName);
             opts.PublishMessage<RoomStatusChangedEvent>().ToRabbitQueue(bookingQueueName);
             opts.PublishMessage<ResourceUpdatedEvent>().ToRabbitQueue(bookingQueueName);
+
+            opts.Policies.AutoApplyTransactions();
         });
     }
 }

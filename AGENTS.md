@@ -9,54 +9,42 @@
 
 ### 1.1 Target Framework (`.NET 10.0`) & Clean Architecture
 - **Decision:** Build `Studium-Catalog` matching the `Studium-Users` gold standard with .NET 10 (`net10.0`), Central Package Management (`Directory.Packages.props`), and five Clean Architecture projects:
-  - `Studium-Catalog.Domain` (zero external dependencies)
+  - `Studium-Catalog.Domain` (zero external dependencies; rich entities and domain rules)
   - `Studium-Catalog.Data` (EF Core 10, Npgsql PostgreSQL)
-  - `Studium-Catalog.Services` (DTOs, Wolverine, Mapster)
+  - `Studium-Catalog.Services` (DTOs, Wolverine message contracts, Mapster)
   - `Studium-Catalog.Api` (Thin composition root, Scalar, OpenAPI, Health check)
-  - `Studium-Catalog.Tests` (xUnit test suite with 23 passing tests)
+  - `Studium-Catalog.Tests` (xUnit test suite with 23 passing unit tests)
 
-### 1.2 Domain Model & Aggregates
-- **Entities:**
-  - `Building`: Campus building with unique institutional `Code`, `Name`, optional `Address`, and `Rooms` collection. Enforces `EnsureCanBeDeleted` invariant preventing deletion when rooms exist.
-  - `Room` (Aggregate Root): Represents physical room with `BuildingId`, `Code` (unique per building), `Name`, `Type` (`RoomType`), `Capacity` (1-1000), `Floor`, `MapPositionX`/`MapPositionY` (0-100% pin coordinates for floor plan), and `IsActive` flag. Owns resources, operating hours, and maintenance blocks.
-  - `ResourceItem`: Equipment installed in room (`ResourceType`, `Quantity`, `ResourceStatus`). Mutated through `Room.AddResource`, `UpdateResource`, `RemoveResource`.
-  - `AvailabilitySchedule`: Weekly operating windows (`DayOfWeek`, `OpensAt`, `ClosesAt`). Enforces chronological ordering, opening < closing, and non-overlapping windows per day via `Room.SetOperatingHours`.
-  - `MaintenanceBlock`: Temporary blocking interval (`StartsAtUtc`, `EndsAtUtc`, `Reason`, `CreatedByUserId`). Validates future end date and non-overlapping intervals via `Room.ScheduleMaintenance` and `CancelMaintenance`.
+### 1.2 Messaging Topology: Wolverine with RabbitMQ
+- **Context:** Decoupled event publishing for room status, maintenance schedules, operating hours, and resource modifications.
+- **Decision:**
+  - Connect to RabbitMQ broker (`amqp://studium:StudiumRabbitMQ2026!@studium-rabbitmq-service.studium.svc.cluster.local:5672`) with `.AutoProvision()`.
+  - Publish `RoomMaintenanceEvent`, `OperatingHoursChangedEvent`, `RoomStatusChangedEvent`, and `ResourceUpdatedEvent` to `studium-booking-events-queue`.
+  - Configured transactional outbox via `opts.Policies.AutoApplyTransactions()` to guarantee atomic messaging across EF Core updates.
+  - SQS version preserved on branch `origin/sqs`.
 
-### 1.3 Wolverine Messaging over RabbitMQ
-- **Conclusion:** Wolverine over RabbitMQ (`WolverineFx.RabbitMQ`) is used for outbound domain events connecting to `studium-rabbitmq-service.studium.svc.cluster.local:5672`:
-  - `RoomMaintenanceEvent`: Published when maintenance is scheduled or cancelled. Dispatched to `studium-booking-events-queue`.
-  - `OperatingHoursChangedEvent`: Published to `studium-booking-events-queue`.
-  - `RoomStatusChangedEvent`: Published to `studium-booking-events-queue`.
-  - `ResourceUpdatedEvent`: Published to `studium-booking-events-queue`.
-- **Pre-generated Code:** Configured with `CritterStackDefaults` using `TypeLoadMode.Static` in Production and pre-generated via `codegen write` during Docker multi-stage build.
-- **Legacy branch:** AWS SQS version preserved on branch `origin/sqs`.
+### 1.3 Asynchronous Event Choreography vs Synchronous Query
+- **Decision:** Avoid direct HTTP RPC between services for availability checking. `Studium-Booking` maintains its own replicated read model (`ReplicatedRoom`, `ReplicatedMaintenanceBlock`, `ReplicatedOperatingHours`) updated purely via RabbitMQ events published by `Studium-Catalog`.
+
+### 1.4 Pre-Generated Wolverine Codegen in Docker Build
+- Configured `CritterStackDefaults` with `TypeLoadMode.Static` in Production, and `codegen write` pre-generates handler code during Docker multi-stage builds.
 
 ---
 
-## 2. Project Structure & File Map
-- [`Studium-Catalog.sln`](./Studium-Catalog.sln) — Root solution file.
-- [`Directory.Build.props`](./Directory.Build.props) & [`Directory.Packages.props`](./Directory.Packages.props) — CPM with `WolverineFx.RabbitMQ`.
+## 2. Directory Structure & Key Files
 - **`Domain/`:**
-  - `Entities/Buildings/Building.cs` — Building entity and invariants.
-  - `Entities/Rooms/Room.cs` — Room aggregate root.
-  - `Entities/ResourceItems/ResourceItem.cs` — Equipment entity.
-  - `Entities/AvailabilitySchedules/AvailabilitySchedule.cs` — Weekly operating window record.
-  - `Entities/MaintenanceBlocks/MaintenanceBlock.cs` — Maintenance block entity.
-  - `Exceptions/DomainException.cs` & `EntityNotFoundException.cs` — Domain exceptions.
-  - `Common/UtcDateTime.cs` — UTC normalization helper.
+  - `Entities/Buildings/Building.cs` — Building aggregate root.
+  - `Entities/Rooms/Room.cs` — Room aggregate root managing resources, operating hours, and maintenance blocks.
+  - `Entities/Rooms/RoomResource.cs`, `OperatingHours.cs`, `MaintenanceBlock.cs` — Owned entities.
 - **`Data/`:**
-  - `CatalogDbContext.cs` — DbContext applying Fluent API configurations.
-  - `Configurations/BuildingConfig.cs`, `RoomConfig.cs`, `ResourceItemConfig.cs`, `AvailabilityScheduleConfig.cs`, `MaintenanceBlockConfig.cs` — Strict EF Core mappings.
-  - `Migrations/20261108230207_Initial_Migration.cs` — EF Core migration for PostgreSQL.
+  - `CatalogDbContext.cs` — EF Core context with applied configurations.
+  - `Configurations/` — Fluent API configurations.
+  - `Migrations/` — Auto-applied migrations.
 - **`Services/`:**
-  - `DTOs/` — Positional record DTOs (`BuildingDtos.cs`, `RoomDtos.cs`, `ResourceItemDtos.cs`, `ScheduleDtos.cs`, `EventDtos.cs`).
-  - `CatalogEvents/CatalogEventFactory.cs` — Outbound event builder.
-  - `Options/CatalogOptions.cs` — Timezone and catalog options.
+  - `DTOs/` — Request, response, and event contracts.
+  - `Mapping/MappingConfig.cs` — Mapster compile-safe mappings.
 - **`Api/`:**
-  - `Program.cs` — Thin composition root with OpenAPI, Scalar, Wolverine RabbitMQ, and Health check.
-  - `Controllers/BuildingsController.cs` & `RoomsController.cs` — REST controllers.
-  - `Middleware/DomainExceptionHandler.cs` — ProblemDetails exception handler.
+  - `Controllers/BuildingsController.cs` & `RoomsController.cs` — REST endpoints under `/api/catalog/buildings` and `/api/catalog/rooms`.
   - `HostedServices/DatabaseMigrationHostedService.cs` — Startup migration runner.
   - `Extensions/AuthenticationExtensions.cs` & `MessagingExtensions.cs` — Modular DI extensions.
 - **`Tests/`:**
@@ -69,6 +57,9 @@
 ---
 
 ## 3. Recent Changes History
+- **2026-11-09 (Wolverine Transactional Outbox):**
+  - Enabled transactional outbox via `opts.Policies.AutoApplyTransactions()` in `MessagingExtensions.cs`.
+  - Regenerated Wolverine static handlers and verified all 23 unit tests pass.
 - **2026-11-09 (Cleaned Obsolete Notifications Queue & SQS Config):**
   - Removed obsolete publishing of `RoomMaintenanceEvent` to `studium-notifications-queue` since notifications are synchronous in `Studium-Notifications`.
   - Replaced legacy `SQS` settings in `appsettings.json` with active `RabbitMQ` settings.
