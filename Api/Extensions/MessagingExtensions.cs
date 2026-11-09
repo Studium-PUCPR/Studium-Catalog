@@ -23,9 +23,6 @@ public static class MessagingExtensions
             opts.PublishMessage<OperatingHoursChangedEvent>().ToRabbitQueue(bookingQueueName);
             opts.PublishMessage<RoomStatusChangedEvent>().ToRabbitQueue(bookingQueueName);
             opts.PublishMessage<ResourceUpdatedEvent>().ToRabbitQueue(bookingQueueName);
-
-            var notificationsQueueName = builder.Configuration["RabbitMQ:NotificationsQueueName"] ?? "studium-notifications-queue";
-            opts.PublishMessage<RoomMaintenanceEvent>().ToRabbitQueue(notificationsQueueName);
         });
     }
 }

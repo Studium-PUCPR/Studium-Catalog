@@ -25,7 +25,7 @@
 
 ### 1.3 Wolverine Messaging over RabbitMQ
 - **Conclusion:** Wolverine over RabbitMQ (`WolverineFx.RabbitMQ`) is used for outbound domain events connecting to `studium-rabbitmq-service.studium.svc.cluster.local:5672`:
-  - `RoomMaintenanceEvent`: Published when maintenance is scheduled or cancelled. Dispatched to `studium-booking-events-queue` and `studium-notifications-queue`.
+  - `RoomMaintenanceEvent`: Published when maintenance is scheduled or cancelled. Dispatched to `studium-booking-events-queue`.
   - `OperatingHoursChangedEvent`: Published to `studium-booking-events-queue`.
   - `RoomStatusChangedEvent`: Published to `studium-booking-events-queue`.
   - `ResourceUpdatedEvent`: Published to `studium-booking-events-queue`.
@@ -69,6 +69,10 @@
 ---
 
 ## 3. Recent Changes History
+- **2026-11-09 (Cleaned Obsolete Notifications Queue & SQS Config):**
+  - Removed obsolete publishing of `RoomMaintenanceEvent` to `studium-notifications-queue` since notifications are synchronous in `Studium-Notifications`.
+  - Replaced legacy `SQS` settings in `appsettings.json` with active `RabbitMQ` settings.
+  - Regenerated static handlers via `codegen write` and verified 23 unit tests pass.
 - **2026-11-09 (Migrated Messaging from AWS SQS to RabbitMQ):**
   - Replaced `WolverineFx.AmazonSqs` with `WolverineFx.RabbitMQ` (v6.63.0) across `Directory.Packages.props`, `Services/Studium-Catalog.Services.csproj`, and `Api/Studium-Catalog.Api.csproj`.
   - Updated `Api/Extensions/MessagingExtensions.cs` to connect to RabbitMQ broker with `.AutoProvision()`.
