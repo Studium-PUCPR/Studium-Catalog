@@ -15,6 +15,7 @@ data:
   RabbitMQ__BookingQueueName: "studium-booking-events-queue"
   RabbitMQ__NotificationsQueueName: "studium-notifications-queue"
   Catalog__TimeZone: "America/Sao_Paulo"
+  Cors__AllowedOrigins: "*"
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -29,6 +29,9 @@
 - Configured Npgsql's transient execution strategy (`EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null)`).
 - Segregated Kubernetes probes: shallow liveness at `/health` and deep readiness at `/health/ready` via `DatabaseHealthCheck` (`CatalogDbContext.Database.CanConnectAsync()`).
 
+### 1.5 Dynamic CORS Configuration
+- **Decision:** Created reusable `CorsExtensions.AddStudiumCors(IConfiguration)` reading comma-separated allowed origins from `Cors:AllowedOrigins` or environment variable `CORS_ALLOWED_ORIGINS` / `Cors__AllowedOrigins` (defaulting to allow all for local development).
+
 ---
 
 ## 2. Directory Structure & Key Files
@@ -46,7 +49,7 @@
 - **`Api/`:**
   - `Controllers/BuildingsController.cs` & `RoomsController.cs` — REST endpoints under `/api/catalog/buildings` and `/api/catalog/rooms`.
   - `HostedServices/DatabaseMigrationHostedService.cs` — Startup migration runner.
-  - `Extensions/AuthenticationExtensions.cs`, `MessagingExtensions.cs`, `DatabaseHealthCheck.cs`.
+  - `Extensions/AuthenticationExtensions.cs`, `MessagingExtensions.cs`, `CorsExtensions.cs`, `DatabaseHealthCheck.cs`.
 - **`Tests/`:**
   - `Domain/BuildingTests.cs` & `RoomTests.cs` — Comprehensive domain unit tests.
   - `DTOs/DtoMappingTests.cs` — Mapster mapping tests.
@@ -54,6 +57,11 @@
 ---
 
 ## 3. Recent Changes History
+- **2026-11-09 (Dynamic CORS Configuration):**
+  - Added `CorsExtensions.cs` reading allowed origins dynamically from configuration/environment variables.
+  - Hooked `AddStudiumCors` and `UseCors(CorsExtensions.PolicyName)` into `Program.cs`.
+  - Added `Cors:AllowedOrigins: "*"` in `appsettings.json` and `Cors__AllowedOrigins` in `k8s/deployment.yaml`.
+  - Verified 23/23 unit tests pass.
 - **2026-11-09 (Database Resilience, Deep Readiness Probes & DLQ Policies):**
   - Configured `EnableRetryOnFailure(3)` on PostgreSQL connection.
   - Added deep readiness probe `/health/ready` (`DatabaseHealthCheck`) and pointed Kubernetes `readinessProbe` to it.
